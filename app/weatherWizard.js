@@ -1,93 +1,162 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Button,
+  Alert,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import * as Device from 'expo-device';
 import axios from 'axios';
 
-const WeatherMagic = () => {
-  const [city, setCity] = useState('');
-  const [data, setData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [err, setErr] = useState('');
+const WeatherApp = () => {
+  const [weatherData, setweatherData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const getWeather = () => {
-    if (!city) return;
-    setIsLoading(true);
-    setErr('');
+  const apiKey = 'b4d4d39a000cd956500a0f09059acaf8';
 
-    axios.get('https://api.openweathermap.org/data/2.5/weather', {
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true
+      }),
+    });
+
+    setupNotifications();
+    getDeviceWeather();
+  }, []);
+
+   const setupNotifications = async () => {
+    if (Device.isDevice) {
+      const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      if (newStatus !== 'granted') {
+            Alert.alert('Permission required', 'Notifications need to be enabled to function.');
+          return;
+        }
+      }
+    } else {
+      Alert.alert('Device Error', 'Push notifdications only work on physical devices.');
+    }
+  };
+
+const getDeviceWeather = async () => {
+setLoading(true);
+setErrorMessage('');
+setweatherData(null);
+
+try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMessage('Location permission is required to get weather.');
+      setLoading(false);
+      return;
+    }
+    
+const location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+
+    const response = await axios.get('https://api.openweathermap.org/data/2.5/weather', {
       params: {
-        q: city,
-        appid: 'b4d4d39a000cd956500a0f09059acaf8',
+        lat: latitude,
+        lon: longitude,
+        appid: apiKey,
         units: 'metric',
       }
-    })
-    .then(res => setData(res.data))
-    .catch(() => setErr('Could not find that city.'))
-    .finally(() => setIsLoading(false));
+    });
+
+    setweatherData(response.data);
+  } catch (error) {
+    setErrorMessage('Could not get weather data.');
+  } finally {
+setLoading(false);
+  }
+};
+
+   const sendTestNotification = async () => {
+    if (!weatherData) {
+Alert.alert('Error', 'No weather data to send in the notification.');
+      return;
+    }
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Weather Update for ${weatherData.name}`,
+          body: `Current temperature: ${weatherData.main.temp}°C`
+        },
+        trigger: { seconds: 2 },
+      });
+      console.log('Notification scheduled successfully.');
+    } catch (error) {
+console.error('Notification scheduling error:', error);
+    }
+  };
+
+const dismissKeyboard = () => {
+Keyboard.dismiss();
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Weather Wizard</Text>
+<TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <View style={styles.container}>
+      <Text style={styles.title}>Weather Info</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="City"
-        value={city}
-        onChangeText={setCity}
-      />
+      <Button title="Get Weather" onPress={getDeviceWeather} />
 
-      <Button title="Weather info" onPress={getWeather} />
+      {loading && <Text>Loading weather...</Text>}
+      {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
-      {isLoading && <ActivityIndicator/>}
+        {weatherData && (
+          <View style={styles.weatherInfo}>
+            <Text style={styles.city}>{weatherData.name}</Text>
+            <Text>Temperature: {weatherData.main.temp}°C</Text>
+            <Text>Sky: {weatherData.weather[0].description}</Text>
+            <Text>Humidity: {weatherData.main.humidity}%</Text>
+            <Text>Wind: {weatherData.wind.speed} m/s</Text>
+          </View>
+        )}
 
-      {err && <Text style={styles.error}>{err}</Text>}
-
-      {data && (
-        <View style={styles.info}>
-          <Text style={styles.city}>{data.name}</Text>
-          <Text>Temp: {data.main.temp}°C</Text>
-          <Text>Sky: {data.weather[0].description}</Text>
-          <Text>Hum: {data.main.humidity}%</Text>
-          <Text>Wind: {data.wind.speed} m/s</Text>
-        </View>
-      )}
-    </View>
+        {weatherData && (
+          <Button title="Send Weather Notification" onPress={sendTestNotification} />
+        )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+container: {
     flex: 1,
-    justifyContent: 'center',
+  justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
+padding: 20
   },
-  heading: {
-    fontSize: 30,
+title: {
+  fontSize: 28,
     marginBottom: 20,
   },
-  input: {
-    height: 45,
-    borderWidth: 2,
-    width: '80%',
-    marginBottom: 20,
-    paddingLeft: 10,
-    borderRadius: 5,
-  },
-  loader: {
-    marginTop: 15,
-  },
-  error: {
-    color: '#FF0000',
+error: {
+color: 'red',
     marginTop: 10,
+},
+weatherInfo: {
+marginTop: 20,
+alignItems: 'center'
   },
-  info: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  city: {
-    fontSize: 35,
-  },
+city: {
+    fontSize: 24,
+    fontWeight: 'bold',
+marginBottom: 10
+  }
 });
 
-export default WeatherMagic;
+export default WeatherApp;

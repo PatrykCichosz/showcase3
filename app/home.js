@@ -6,7 +6,7 @@ const Home = ({ navigation }) => {
     try {
       navigation.navigate(screen);
     } catch (error) {
-      Alert.alert("Error", `Cold not navigate to ${screen}`);
+      Alert.alert("Error", `Could not navigate to ${screen}`);
     }
   };
 
