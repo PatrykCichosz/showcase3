@@ -29,6 +29,7 @@ const WeatherApp = () => {
       }),
     });
 
+
     setupNotifications();
     getDeviceWeather();
   }, []);
