@@ -20,6 +20,7 @@ const WeatherApp = () => {
 
   const apiKey = 'b4d4d39a000cd956500a0f09059acaf8';
 
+  
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
