@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Alert, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Alert, Keyboard, TouchableWithoutFeedback, ImageBackground, ScrollView, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WeatherApp = () => {
   const [weatherData, setWeatherData] = useState(null);
@@ -12,29 +13,35 @@ const WeatherApp = () => {
   const [criteriaValue, setCriteriaValue] = useState('');
   const [condition, setCondition] = useState('');
   const [showCriteriaMenu, setShowCriteriaMenu] = useState(false);
-  const [pushToken, setPushToken] = useState(null);  // To store the push token
+  const [pushToken, setPushToken] = useState(null);
+  const [forecastData, setForecastData] = useState(null);
   const apiKey = 'b4d4d39a000cd956500a0f09059acaf8';
+  const [weatherBackground, setWeatherBackground] = useState('');
 
+
+  
   useEffect(() => {
     getDeviceWeather();
     registerForPushNotifications();
   }, []);
 
-  // Register the device for push notifications
   const registerForPushNotifications = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
       setErrorMessage('Notification permission is required.');
       return;
     }
+
     const token = await Notifications.getExpoPushTokenAsync();
     setPushToken(token.data);
+    await AsyncStorage.setItem('pushToken', token.data);
   };
 
   const getDeviceWeather = async () => {
     setLoading(true);
     setErrorMessage('');
     setWeatherData(null);
+    setForecastData(null);
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -47,16 +54,29 @@ const WeatherApp = () => {
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
 
-      const response = await axios.get('https://api.openweathermap.org/data/2.5/weather', {
+      const weatherResponse = await axios.get('https://api.openweathermap.org/data/2.5/weather', {
         params: {
           lat: latitude,
           lon: longitude,
           appid: apiKey,
           units: 'metric',
-        }
+        },
       });
 
-      setWeatherData(response.data);
+      const forecastResponse = await axios.get('https://api.openweathermap.org/data/2.5/forecast', {
+        params: {
+          lat: latitude,
+          lon: longitude,
+          appid: apiKey,
+          units: 'metric',
+        },
+      });
+
+      setWeatherData(weatherResponse.data);
+      setForecastData(forecastResponse.data.list.filter((item, index) => index % 8 === 0).slice(0, 5));
+
+      const weatherCondition = weatherResponse.data.weather[0].main.toLowerCase();
+      setWeatherBackground(getBackgroundForWeatherCondition(weatherCondition));
     } catch (error) {
       setErrorMessage('Could not retrieve weather data. Try again later.');
     } finally {
@@ -64,77 +84,107 @@ const WeatherApp = () => {
     }
   };
 
-  // Handle test notification
+  const getBackgroundForWeatherCondition = (condition) => {
+    switch (condition) {
+      case 'clear':
+        return require('../assets/beautiful-clouds-digital-art_23-2151105870.jpg');
+      case 'clouds':
+        return require('../assets/digital-art-isolated-house.jpg');
+      case 'rain':
+        return require('../assets/rainy_sky.jpg');
+      case 'thunderstorm':
+        return require('../assets/thunderstorm_sky.jpg');
+      case 'snow':
+        return require('../assets/snowy_sky.jpg');
+      case 'drizzle':
+        return require('../assets/drizzle_sky.jpg');
+      default:
+        return require('../assets/clear_sky.jpg');
+    }
+  };
+  
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
   const handleTestNotification = async () => {
     if (!selectedCriteria || !criteriaValue || !condition) {
-      Alert.alert('Error', 'Please select a criterion, condition (above/below/yes/no), and set the value.');
+      Alert.alert('Error', 'Please select a criteria, condition (above/below/yes/no), and set the value.');
       return;
     }
-
+  
     if (!weatherData) {
       Alert.alert('Error', 'Weather data is not available.');
       return;
     }
-
+  
     let conditionMet = false;
     const temp = weatherData.main.temp;
     const humidity = weatherData.main.humidity;
-    const rain = weatherData.rain ? weatherData.rain['1h'] : 0; // Rain volume in last 1 hour
-
+    const rain = weatherData.rain ? weatherData.rain['1h'] : 0;
+  
+    let conditionText = '';
+  
     switch (selectedCriteria) {
       case 'Temperature':
         if (condition === 'Above' && temp > criteriaValue) {
           conditionMet = true;
+          conditionText = `Temperature Above ${criteriaValue}°C`;
         } else if (condition === 'Below' && temp < criteriaValue) {
           conditionMet = true;
+          conditionText = `Temperature Below ${criteriaValue}°C`;
         }
         break;
-
+  
       case 'Humidity':
         if (condition === 'Above' && humidity > criteriaValue) {
           conditionMet = true;
+          conditionText = `Humidity Above ${criteriaValue}%`;
         } else if (condition === 'Below' && humidity < criteriaValue) {
           conditionMet = true;
+          conditionText = `Humidity Below ${criteriaValue}%`;
         }
         break;
-
+  
       case 'Rain':
         if (condition === 'Yes' && rain > 0) {
           conditionMet = true;
+          conditionText = 'Rainy conditions';
         } else if (condition === 'No' && rain === 0) {
           conditionMet = true;
+          conditionText = 'No rain';
         }
         break;
-
+  
       default:
         break;
     }
-
+  
     if (conditionMet && pushToken) {
-      // Send a notification if the condition is met
-      await sendPushNotification();
+      await sendPushNotification(conditionText);
     } else {
       Alert.alert('Notification Not Sent', `The ${selectedCriteria} condition has not been met.`);
     }
   };
 
-  // Send a push notification using Expo Notifications (native-like notification)
-  const sendPushNotification = async () => {
+  const sendPushNotification = async (conditionText) => {
     const message = {
       to: pushToken,
       sound: 'default',
       title: 'Weather Notification',
-      body: `The ${selectedCriteria} condition has been met!`,
-      data: { criteria: selectedCriteria },
+      body: `The condition '${conditionText}' has been met!`,
+      data: { criteria: selectedCriteria, conditionText: conditionText },
     };
 
     try {
-      // Expo Notifications: Send immediate push notification
       await Notifications.scheduleNotificationAsync({
         content: message,
-        trigger: null, // trigger it immediately
+        trigger: { seconds: 1 },
       });
-      // Alert.alert('Notification Sent', `The ${selectedCriteria} condition has been met!`);
     } catch (error) {
       console.error('Error sending notification', error);
     }
@@ -144,128 +194,159 @@ const WeatherApp = () => {
     setShowCriteriaMenu(!showCriteriaMenu);
   };
 
-  // Dismiss keyboard function
   const dismissKeyboard = () => {
     Keyboard.dismiss();
   };
 
+  const handleForecastRedirect = (forecast) => {
+    const forecastDate = new Date(forecast.dt_txt);
+    const forecastURL = `https://openweathermap.org/city/${weatherData.id}?forecast=${forecastDate.toLocaleDateString()}`;
+    Linking.openURL(forecastURL);
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>WeatherWizard</Text>
+      <ImageBackground source={weatherBackground} style={styles.backgroundImage}>
+        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+          {loading && <ActivityIndicator size="large" color="#00C6FF" />}
+          {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
-      <TouchableOpacity style={styles.button} onPress={getDeviceWeather}>
-        <Text style={styles.buttonText}>Get Weather</Text>
-      </TouchableOpacity>
+          {weatherData && (
+            <View style={styles.weatherInfo}>
+              <Text style={styles.city}>{weatherData.name}</Text>
+              <Text style={styles.temperature}>{weatherData.main.temp}°C</Text>
+              <Text style={styles.weatherText}>🌥 {weatherData.weather[0].description}</Text>
+              <Text style={styles.weatherText}>💧 Humidity: {weatherData.main.humidity}%</Text>
+              <Text style={styles.weatherText}>💨 Wind: {weatherData.wind.speed} m/s</Text>
+              <Text style={styles.weatherText}>🌧 Rain: {weatherData.rain ? weatherData.rain['1h'] : 0} mm</Text>
+            </View>
+          )}
 
-      {loading && <ActivityIndicator size="large" color="#00C6FF" />}
-      {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.forecastContainer}>
+            {forecastData && forecastData.map((forecast, index) => (
+              <TouchableOpacity key={index} onPress={() => handleForecastRedirect(forecast)}>
+                <View style={styles.forecastItem}>
+                  <Text style={styles.forecastDate}>{new Date(forecast.dt_txt).toLocaleDateString()}</Text>
+                  <Text style={styles.forecastText}>🌡 {forecast.main.temp}°C</Text>
+                  <Text style={styles.forecastText}>🌥 {forecast.weather[0].description}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-      {weatherData && (
-        <View style={styles.weatherInfo}>
-          <Text style={styles.city}>{weatherData.name}</Text>
-          <Text style={styles.weatherText}>🌡 Temperature: {weatherData.main.temp}°C</Text>
-          <Text style={styles.weatherText}>🌥 Sky: {weatherData.weather[0].description}</Text>
-          <Text style={styles.weatherText}>💧 Humidity: {weatherData.main.humidity}%</Text>
-          <Text style={styles.weatherText}>💨 Wind: {weatherData.wind.speed} m/s</Text>
-          <Text style={styles.weatherText}>🌧 Rain: {weatherData.rain ? weatherData.rain['1h'] : 0} mm</Text>
-        </View>
-      )}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.button} onPress={toggleCriteriaMenu}>
+              <Text style={styles.buttonText}>Set Notification Criteria</Text>
+            </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={toggleCriteriaMenu}>
-        <Text style={styles.buttonText}>Set Notification Criteria</Text>
-      </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, { marginTop: 20, marginBottom: 20 }]} onPress={handleTestNotification}>
+              <Text style={styles.buttonText}>Test Notification</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </ImageBackground>
 
-      <TouchableOpacity style={styles.button} onPress={handleTestNotification}>
-        <Text style={styles.buttonText}>Test Notification</Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={showCriteriaMenu}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={toggleCriteriaMenu}
-      >
-        <TouchableWithoutFeedback onPress={dismissKeyboard}>
-          <View style={styles.modalContainer}>
+      <Modal visible={showCriteriaMenu} transparent={true}>
+        <View style={styles.modalContainer}>
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
             <View style={styles.modalContent}>
-              <Text style={styles.criteriaText}>Select Criterion:</Text>
-
+              <Text style={styles.criteriaText}>Step 1: Select Criteria</Text>
               <TouchableOpacity
                 style={[styles.criteriaButton, selectedCriteria === 'Temperature' && styles.selectedButton]}
                 onPress={() => setSelectedCriteria('Temperature')}
               >
-                <Text style={styles.buttonText}>Temperature</Text>
+                <Text>Temperature</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.criteriaButton, selectedCriteria === 'Humidity' && styles.selectedButton]}
                 onPress={() => setSelectedCriteria('Humidity')}
               >
-                <Text style={styles.buttonText}>Humidity</Text>
+                <Text>Humidity</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.criteriaButton, selectedCriteria === 'Rain' && styles.selectedButton]}
                 onPress={() => setSelectedCriteria('Rain')}
               >
-                <Text style={styles.buttonText}>Rain</Text>
+                <Text>Rain</Text>
               </TouchableOpacity>
 
-              {selectedCriteria && (
+              {selectedCriteria === 'Temperature' && (
                 <View>
-                  <Text style={styles.criteriaText}>Choose condition:</Text>
-
-                  {selectedCriteria === 'Temperature' || selectedCriteria === 'Humidity' ? (
-                    <View>
-                      <TouchableOpacity
-                        style={[styles.criteriaButton, condition === 'Above' && styles.selectedButton]}
-                        onPress={() => setCondition('Above')}
-                      >
-                        <Text style={styles.buttonText}>Above</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.criteriaButton, condition === 'Below' && styles.selectedButton]}
-                        onPress={() => setCondition('Below')}
-                      >
-                        <Text style={styles.buttonText}>Below</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-
-                  {selectedCriteria === 'Rain' && (
-                    <View>
-                      <TouchableOpacity
-                        style={[styles.criteriaButton, condition === 'Yes' && styles.selectedButton]}
-                        onPress={() => setCondition('Yes')}
-                      >
-                        <Text style={styles.buttonText}>Yes</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.criteriaButton, condition === 'No' && styles.selectedButton]}
-                        onPress={() => setCondition('No')}
-                      >
-                        <Text style={styles.buttonText}>No</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
                   <TextInput
-                    style={styles.input}
-                    placeholder={`Enter ${selectedCriteria} value`}
+                    style={styles.criteriaInput}
+                    placeholder="Set Value"
+                    keyboardType="numeric"
                     value={criteriaValue}
                     onChangeText={setCriteriaValue}
-                    keyboardType="numeric"
                   />
+                  <View style={styles.conditionContainer}>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'Above' && styles.selectedCondition]}
+                      onPress={() => setCondition('Above')}
+                    >
+                      <Text>Above</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'Below' && styles.selectedCondition]}
+                      onPress={() => setCondition('Below')}
+                    >
+                      <Text>Below</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
-              <TouchableOpacity style={styles.button} onPress={toggleCriteriaMenu}>
-                <Text style={styles.buttonText}>Close</Text>
+              {selectedCriteria === 'Humidity' && (
+                <View>
+                  <TextInput
+                    style={[styles.criteriaInput, { width: '90%' }]}
+                    placeholder="Set Value"
+                    keyboardType="numeric"
+                    value={criteriaValue}
+                    onChangeText={setCriteriaValue}
+                  />
+                  <View style={styles.conditionContainer}>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'Above' && styles.selectedCondition]}
+                      onPress={() => setCondition('Above')}
+                    >
+                      <Text>Above</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'Below' && styles.selectedCondition]}
+                      onPress={() => setCondition('Below')}
+                    >
+                      <Text>Below</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {selectedCriteria === 'Rain' && (
+                <View>
+                  <View style={styles.conditionContainer}>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'Yes' && styles.selectedCondition]}
+                      onPress={() => setCondition('Yes')}
+                    >
+                      <Text>Yes</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.conditionButton, condition === 'No' && styles.selectedCondition]}
+                      onPress={() => setCondition('No')}
+                    >
+                      <Text>No</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity style={styles.closeButton} onPress={toggleCriteriaMenu}>
+                <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </View>
   );
@@ -274,45 +355,75 @@ const WeatherApp = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  backgroundImage: {
+    flex: 1,
+    resizeMode: 'cover',
+    justifyContent: 'flex-start',
+  },
+  scrollViewContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#1C1C1C',
+    paddingBottom: 20,
   },
-  title: {
-    fontSize: 24,
-    color: '#00C6FF',
+  weatherInfo: {
+    alignItems: 'center',
+    marginTop: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    padding: 15,
+    borderRadius: 10,
+  },
+  
+  city: {
+    fontSize: 30,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#000',
+  },
+  
+  temperature: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  
+  weatherText: {
+    fontSize: 18,
+    color: '#000',
+    marginBottom: 5,
+  },
+  forecastContainer: {
+    marginTop: 20,
+  },
+  forecastItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    padding: 10,
+    borderRadius: 10,
+    margin: 10,
+  },
+  forecastDate: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  forecastText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  buttonContainer: {
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#00C6FF',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 10,
-    width: '80%',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-  },
-  error: {
-    color: 'red',
-    marginTop: 10,
-  },
-  weatherInfo: {
+    padding: 15,
+    borderRadius: 10,
     marginTop: 20,
     alignItems: 'center',
   },
-  city: {
-    fontSize: 28,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  weatherText: {
+  buttonText: {
     fontSize: 18,
-    color: '#FFFFFF',
+    color: '#FFF',
   },
   modalContainer: {
     flex: 1,
@@ -321,46 +432,63 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#1C1C1C',
+    backgroundColor: '#FFF',
     padding: 20,
-    borderRadius: 8,
+    borderRadius: 10,
     width: '80%',
+    alignItems: 'center',
   },
   criteriaText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
   },
   criteriaButton: {
-    backgroundColor: '#333',
+    backgroundColor: '#f0f0f0',
     padding: 10,
-    borderRadius: 8,
-    marginVertical: 5,
+    borderRadius: 10,
+    marginBottom: 10,
+    width: '100%',
     alignItems: 'center',
   },
   selectedButton: {
     backgroundColor: '#00C6FF',
   },
-  doneButtonContainer: {
-    marginTop: 20,
-    width: '100%',
-    alignItems: 'center',
+  criteriaInput: {
+    height: 50,
+    borderColor: '#00C6FF',
+    borderWidth: 1,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    width: '80%',
   },
-  doneButton: {
+  conditionContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  conditionButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 10,
+    margin: 10,
+  },
+  selectedCondition: {
+    backgroundColor: '#00C6FF',
+  },
+  closeButton: {
     backgroundColor: '#00C6FF',
     padding: 10,
-    borderRadius: 8,
-    width: '50%',
-    alignItems: 'center',
+    borderRadius: 10,
+    marginTop: 20,
   },
-  input: {
-    backgroundColor: '#333',
-    padding: 10,
-    borderRadius: 8,
-    width: '80%',
-    marginVertical: 10,
-    color: '#FFFFFF',
+  closeButtonText: {
+    fontSize: 18,
+    color: '#FFF',
+  },
+  error: {
     fontSize: 16,
+    color: 'red',
+    marginBottom: 20,
   },
 });
 

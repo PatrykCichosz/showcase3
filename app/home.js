@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ImageBackground } from 'react-native';
 
 const Home = ({ navigation }) => {
   const handleNav = (screen) => {
@@ -11,38 +11,60 @@ const Home = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>NotiApp</Text>
+    <ImageBackground 
+      source={require('../assets/background.jpg')} 
+      style={styles.background} 
+      resizeMode="cover"
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>NotiApp</Text>
 
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#009900' }]} onPress={() => handleNav('BusBuddy')}>
-          <Text style={styles.buttonText}>BusBuddy</Text>
-        </TouchableOpacity>
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#009900' }]} 
+            onPress={() => handleNav('BusBuddy')}
+          >
+            <Text style={styles.buttonText}>BusBuddy</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#0080FF' }]} onPress={() => handleNav('WeatherWizard')}>
-          <Text style={styles.buttonText}>WeatherWizard</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#0080FF' }]} 
+            onPress={() => handleNav('WeatherWizard')}
+          >
+            <Text style={styles.buttonText}>WeatherWizard</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#FF0000' }]} onPress={() => handleNav('TrendTracker')}>
-          <Text style={styles.buttonText}>TrendTracker</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#FF0000' }]} 
+            onPress={() => handleNav('TrendTracker')}
+          >
+            <Text style={styles.buttonText}>TrendTracker</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    backgroundColor: '#121212',
+    justifyContent: 'center', // Center content vertically
+    alignItems: 'center', // Center content horizontally
+  },
+  container: {
+    width: '100%',
+    padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
   },
   title: {
-    fontSize: 36,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 10,
     marginBottom: 50,
   },
   optionsContainer: {
@@ -51,10 +73,11 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '80%',
-    padding: 15,
+    padding: 20,
     borderRadius: 10,
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 15,
+    opacity: 0.8, // Slightly transparent to blend with the background
   },
   buttonText: {
     color: '#FFFFFF',
