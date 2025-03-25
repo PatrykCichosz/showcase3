@@ -23,12 +23,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-sqlite",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "TFI_API_KEY": "08f58a4d3705418c89cec6ee4a6e31e0",
       "router": {
         "origin": false
       },
