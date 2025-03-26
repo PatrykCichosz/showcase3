@@ -4,6 +4,14 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LogBox } from 'react-native';
+
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'expo-notifications: Push notifications (remote notifications) functionality provided by expo-notifications will be removed from Expo Go in SDK 53.',
+    'expo-notifications functionality is not fully supported in Expo Go',
+  ]);
+}
 
 const WeatherApp = () => {
   const [weatherData, setWeatherData] = useState(null);

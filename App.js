@@ -5,7 +5,14 @@ import HomePage from './app/home';
 import WeatherWizard from './app/weatherWizard';
 import BusBuddy from './app/busBuddy';
 import TrendTracker from './app/trendTracker';
+import { LogBox } from 'react-native';
 
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'expo-notifications: Push notifications (remote notifications) functionality provided by expo-notifications will be removed from Expo Go in SDK 53.',
+    'expo-notifications functionality is not fully supported in Expo Go',
+  ]);
+}
 
 const Nav = createBottomTabNavigator();
 
