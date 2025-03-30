@@ -6,7 +6,6 @@ import WeatherWizard from './app/weatherWizard';
 import BusBuddy from './app/busBuddy';
 import TrendTracker from './app/trendTracker';
 
-
 const Nav = createBottomTabNavigator();
 
 const App = () => {
