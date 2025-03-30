@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Button, Text, Platform } from 'react-native';
 import Papa from 'papaparse';
-import { ref, set, push } from "firebase/database"; // For Realtime Database
-// or
-import { collection, addDoc } from "firebase/firestore"; // For Firestore
-import db from '../firebaseConfig'; // Firebase config
+import { ref, set, push } from "firebase/database";
+import { collection, addDoc } from "firebase/firestore";
+import db from '../firebaseConfig';
 
 const FileUpload = () => {
   const [message, setMessage] = useState('');
@@ -23,7 +22,7 @@ const FileUpload = () => {
       const parsedData = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 
       parsedData.forEach(stop => {
-        addStopToFirebase(stop); // Or addStopToFirestore(stop);
+        addStopToFirebase(stop);
       });
     };
     reader.readAsText(file);
@@ -41,7 +40,6 @@ const FileUpload = () => {
       });
   };
 
-  // For Firestore
   const addStopToFirestore = async (stop) => {
     try {
       const docRef = await addDoc(collection(db, "busStops"), stop);

@@ -2,7 +2,6 @@ import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabase('bus_stops.db');
 
-// Initialize the database and create the table if it doesn't exist
 export const initializeDatabase = () => {
   db.transaction(tx => {
     tx.executeSql(
@@ -25,7 +24,6 @@ export const initializeDatabase = () => {
   });
 };
 
-// Insert a bus stop into the database
 export const insertBusStop = (busStop) => {
   db.transaction(tx => {
     tx.executeSql(
@@ -50,7 +48,6 @@ export const insertBusStop = (busStop) => {
   });
 };
 
-// Retrieve all bus stops from the database
 export const getBusStops = (callback) => {
   db.transaction(tx => {
     tx.executeSql(

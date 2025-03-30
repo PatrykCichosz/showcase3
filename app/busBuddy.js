@@ -2,15 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 
-if (__DEV__) {
-  const originalWarn = console.warn;
-  console.warn = (message, ...args) => {
-    if (typeof message === 'string' && message.includes('expo-notifications')) {
-      return; // Ignore specific warning messages
-    }
-    originalWarn(message, ...args); // Continue logging other warnings
-  };
-}
 
 const BusBuddy = () => {
   const [routeShortNameInput, setRouteShortNameInput] = useState('');
@@ -20,8 +11,8 @@ const BusBuddy = () => {
   const [journeyActive, setJourneyActive] = useState(false);
   const [error, setError] = useState('');
   const [buses, setBuses] = useState([]);
-  const [showBuses, setShowBuses] = useState(false); // State to control whether buses are shown
-  const [timer, setTimer] = useState(30); // Timer state to display countdown
+  const [showBuses, setShowBuses] = useState(false);
+  const [timer, setTimer] = useState(30);
   const mapRef = useRef(null);
 
   const loadRouteData = async () => {
@@ -77,14 +68,14 @@ const BusBuddy = () => {
     }
   };
 
-  // Fetch buses when "Show Buses" is clicked
+
   useEffect(() => {
     if (showBuses) {
       const fetchBusLocations = async () => {
         try {
           const response = await fetch('https://api.nationaltransport.ie/gtfsr/v2/Vehicles?format=json', {
             headers: {
-              'x-api-key': '08f58a4d3705418c89cec6ee4a6e31e0', // Add your API key here
+              'x-api-key': '08f58a4d3705418c89cec6ee4a6e31e0',
             },
           });
           const data = await response.json();
@@ -95,13 +86,13 @@ const BusBuddy = () => {
       };
 
       fetchBusLocations();
-      const interval = setInterval(fetchBusLocations, 30000); // Refresh every 30 seconds
+      const interval = setInterval(fetchBusLocations, 30000);
 
-      // Timer to show countdown for refresh
+
       const timerInterval = setInterval(() => {
         setTimer(prev => {
           if (prev === 1) {
-            return 30; // Reset timer after it hits 0
+            return 30;
           }
           return prev - 1;
         });
@@ -128,7 +119,6 @@ const BusBuddy = () => {
       <Button title="Load Route" onPress={loadRouteData} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {/* Show Buses / Hide Buses button */}
       <Button title={showBuses ? 'Hide Buses' : 'Show Buses'} onPress={() => setShowBuses(!showBuses)} />
 
       {showBuses && <Text style={styles.timer}>Refreshing in {timer} seconds</Text>}

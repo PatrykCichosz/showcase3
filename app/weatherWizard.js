@@ -25,8 +25,6 @@ const WeatherApp = () => {
   const [forecastData, setForecastData] = useState(null);
   const apiKey = 'b4d4d39a000cd956500a0f09059acaf8';
   const [weatherBackground, setWeatherBackground] = useState('');
-
-
   
   useEffect(() => {
     getDeviceWeather();

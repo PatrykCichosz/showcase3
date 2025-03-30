@@ -1,10 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Function to read stops.txt and parse data
 export const loadStopsFromFile = async () => {
   try {
-    // Read the stops.txt file from local assets
+
     const fileUri = FileSystem.documentDirectory + 'stops.txt';
     const fileExists = await FileSystem.getInfoAsync(fileUri);
 
@@ -16,9 +15,9 @@ export const loadStopsFromFile = async () => {
     const fileContent = await FileSystem.readAsStringAsync(fileUri);
     const lines = fileContent.split('\n');
 
-    const stops = lines.slice(1) // Remove header
+    const stops = lines.slice(1)
       .map(line => line.split(','))
-      .filter(cols => cols.length >= 6) // Ensure valid row
+      .filter(cols => cols.length >= 6)
       .map(cols => ({
         id: cols[0]?.trim(),
         code: cols[1]?.trim(),
@@ -27,7 +26,6 @@ export const loadStopsFromFile = async () => {
         longitude: parseFloat(cols[5]?.trim())
       }));
 
-    // Save to AsyncStorage
     await AsyncStorage.setItem('busStops', JSON.stringify(stops));
     console.log("Bus stops loaded from file.");
     return stops;
@@ -37,7 +35,6 @@ export const loadStopsFromFile = async () => {
   }
 };
 
-// Retrieve stops from local storage
 export const getLocalStops = async () => {
   try {
     const data = await AsyncStorage.getItem('busStops');

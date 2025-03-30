@@ -49,8 +49,8 @@ const Home = ({ navigation }) => {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    justifyContent: 'center', // Center content vertically
-    alignItems: 'center', // Center content horizontally
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   container: {
     width: '100%',
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginVertical: 15,
-    opacity: 0.8, // Slightly transparent to blend with the background
+    opacity: 0.8,
   },
   buttonText: {
     color: '#FFFFFF',
