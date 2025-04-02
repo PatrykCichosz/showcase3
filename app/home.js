@@ -1,9 +1,5 @@
 import React from 'react';
-<<<<<<< HEAD
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ImageBackground } from 'react-native';
-=======
-import { View, Text, Button, StyleSheet, Alert } from 'react-native';
->>>>>>> origin/main
 
 const Home = ({ navigation }) => {
   const handleNav = (screen) => {
@@ -15,7 +11,6 @@ const Home = ({ navigation }) => {
   };
 
   return (
-<<<<<<< HEAD
     <ImageBackground 
       source={require('../assets/background.jpg')} 
       style={styles.background} 
@@ -48,34 +43,10 @@ const Home = ({ navigation }) => {
         </View>
       </View>
     </ImageBackground>
-=======
-    <View style={styles.container}>
-      <Text style={styles.title}>NotiApp</Text>
-
-      <View style={styles.optionsContainer}>
-        <Button
-          title="BusBuddy"
-          onPress={() => handleNav('BusBuddy')}
-          color="#009900"
-        />
-        <Button
-          title="WeatherWizard"
-          onPress={() => handleNav('WeatherWizard')}
-          color="#0080FF"
-        />
-        <Button
-          title="TrendTracker"
-          onPress={() => handleNav('TrendTracker')}
-          color="#FF0000"
-        />
-      </View>
-    </View>
->>>>>>> origin/main
   );
 };
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
   background: {
     flex: 1,
     justifyContent: 'center',
@@ -116,21 +87,3 @@ const styles = StyleSheet.create({
 });
 
 export default Home;
-=======
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 20
-  },
-  title: {
-    fontSize: 32,
-    marginBottom: 100,
-  },
-  optionsContainer: {
-    justifyContent: 'space-around',
-    width: '80%',
-    flex: 0.5
-  },
-});
-export default Home;
->>>>>>> origin/main

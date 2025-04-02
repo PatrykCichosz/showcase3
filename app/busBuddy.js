@@ -1,8 +1,7 @@
-<<<<<<< HEAD
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
-import MapView, { Polyline, Marker } from 'react-native-maps';
-
+import { View, TextInput, Button, StyleSheet, Alert, Text } from 'react-native';
+import MapView, { Polyline } from 'react-native-maps';
+import * as Notifications from 'expo-notifications';
 
 const BusBuddy = () => {
   const [routeShortNameInput, setRouteShortNameInput] = useState('');
@@ -11,10 +10,39 @@ const BusBuddy = () => {
   const [remainingRoute, setRemainingRoute] = useState([]);
   const [journeyActive, setJourneyActive] = useState(false);
   const [error, setError] = useState('');
-  const [buses, setBuses] = useState([]);
-  const [showBuses, setShowBuses] = useState(false);
-  const [timer, setTimer] = useState(30);
   const mapRef = useRef(null);
+  let journeyInterval = useRef(null);
+
+  useEffect(() => {
+    const requestPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Notification permissions not granted');
+      }
+    };
+    requestPermissions();
+
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received:', notification);
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification response received:', response);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
 
   const loadRouteData = async () => {
     if (!routeShortNameInput) {
@@ -62,51 +90,68 @@ const BusBuddy = () => {
         latitudeDelta: 0.02,
         longitudeDelta: 0.02,
       }, 1000);
-
     } catch (err) {
       console.error(err);
       setError('Error loading the route.');
     }
   };
 
-
-  useEffect(() => {
-    if (showBuses) {
-      const fetchBusLocations = async () => {
-        try {
-          const response = await fetch('https://api.nationaltransport.ie/gtfsr/v2/Vehicles?format=json', {
-            headers: {
-              'x-api-key': '08f58a4d3705418c89cec6ee4a6e31e0',
-            },
-          });
-          const data = await response.json();
-          setBuses(data.entity || []);
-        } catch (error) {
-          console.error('Error fetching buses:', error);
+  const startJourney = () => {
+    if (remainingRoute.length === 0) return;
+    setJourneyActive(true);
+    journeyInterval.current = setInterval(() => {
+      setRemainingRoute(prev => {
+        if (prev.length <= 1) {
+          clearInterval(journeyInterval.current);
+          setJourneyActive(false);
+          return [];
         }
-      };
+        setTraveledRoute(trav => [...trav, prev[0]]);
+        return prev.slice(1);
+      });
+    }, 1500);
 
-      fetchBusLocations();
-      const interval = setInterval(fetchBusLocations, 30000);
+  const stopJourney = () => {
+    clearInterval(journeyInterval.current);
+    setJourneyActive(false);
+    setTraveledRoute([]);
+    setRemainingRoute(busStops);
+    mapRef.current?.animateToRegion({
+      latitude: busStops[0].shape_pt_lat,
+      longitude: busStops[0].shape_pt_lon,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    }, 1000);
+  };
 
+  const notifyTwoStopsAway = async () => {
+    if (remainingRoute.length < 3) return;
 
-      const timerInterval = setInterval(() => {
-        setTimer(prev => {
-          if (prev === 1) {
-            return 30;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    const destination = remainingRoute[remainingRoute.length - 3];
 
-      return () => {
-        clearInterval(interval);
-        clearInterval(timerInterval);
-      };
+    setTraveledRoute(prev => [...prev, ...remainingRoute.slice(0, -3)]);
+    setRemainingRoute(remainingRoute.slice(-3));
+
+    mapRef.current?.animateToRegion({
+      latitude: destination.shape_pt_lat,
+      longitude: destination.shape_pt_lon,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    }, 1000);
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Bus Buddy",
+          body: "You are two stops away from your destination!",
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null, 
+      });
+    } catch (error) {
+      console.error('Error scheduling notification:', error);
     }
-  }, [showBuses]);
-
-  const handleBusClick = (bus) => {
   };
 
   return (
@@ -115,164 +160,55 @@ const BusBuddy = () => {
         value={routeShortNameInput}
         onChangeText={setRouteShortNameInput}
         placeholder="Enter Route Number"
+        placeholderTextColor="#ccc"
         style={styles.input}
       />
-      <Button title="Load Route" onPress={loadRouteData} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Button title="Load Route" onPress={loadRouteData} color="#3654eb" />
+      <Button title="Start Journey" onPress={startJourney} disabled={journeyActive} color="#f7eb05" />
+      <Button title="Stop Journey" onPress={stopJourney} disabled={!journeyActive} color="#ff5722" />
+      <Button title="Notify Two Stops Away" onPress={notifyTwoStopsAway} disabled={!journeyActive} color="#00bcd4" />
 
-      <Button title={showBuses ? 'Hide Buses' : 'Show Buses'} onPress={() => setShowBuses(!showBuses)} />
-
-      {showBuses && <Text style={styles.timer}>Refreshing in {timer} seconds</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
 
       <MapView ref={mapRef} style={styles.map}>
-        {remainingRoute.length > 0 && (
-          <Polyline 
-            coordinates={remainingRoute.map(stop => ({
-              latitude: stop.shape_pt_lat,
-              longitude: stop.shape_pt_lon,
-            }))} 
-            strokeWidth={3} 
-            strokeColor="yellow" 
-          />
+        {traveledRoute.length > 0 && (
+          <Polyline coordinates={traveledRoute.map(stop => ({ latitude: stop.shape_pt_lat, longitude: stop.shape_pt_lon }))} strokeWidth={5} strokeColor="#3654eb" />
         )}
-
-        {busStops.map((stop, index) => (
-          <Marker 
-            key={`stop-${index}`} 
-            coordinate={{ latitude: stop.shape_pt_lat, longitude: stop.shape_pt_lon }} 
-            pinColor="blue"
-            title={`Stop ${index + 1}`}
-          />
-        ))}
-
-        {showBuses && buses.map((bus, index) => (
-          <Marker 
-            key={`bus-${index}`} 
-            coordinate={{ latitude: bus.vehicle.position.latitude, longitude: bus.vehicle.position.longitude }} 
-            pinColor="red"
-            title={`Bus ${bus.vehicle.trip.trip_id}`}
-            onPress={() => handleBusClick(bus)}
-          />
-        ))}
+        {remainingRoute.length > 0 && (
+          <Polyline coordinates={remainingRoute.map(stop => ({ latitude: stop.shape_pt_lat, longitude: stop.shape_pt_lon }))} strokeWidth={5} strokeColor="#f7eb05" />
+        )}
       </MapView>
     </View>
-=======
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  Alert,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from 'react-native';
-import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
-
-const BusBuddy = () => {
-  const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  useEffect(() => {
-    requestLocationPermission();
-  }, []);
-
-  const requestLocationPermission = async () => {
-    setLoading(true);
-    setErrorMessage('');
-
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMessage('Location permission is required to use the map.');
-        setLoading(false);
-        return;
-      }
-
-      const userLocation = await Location.getCurrentPositionAsync({});
-      setLocation({
-        latitude: userLocation.coords.latitude,
-        longitude: userLocation.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    } catch (error) {
-      setErrorMessage('Could not fetch location.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const dismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
-
-  return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Bus Buddy</Text>
-
-        <Button title="Refresh Location" onPress={requestLocationPermission} />
-
-        {loading && <Text>Loading location...</Text>}
-        {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
-
-        {location && (
-          <MapView
-            style={styles.map}
-            initialRegion={location}
-            showsUserLocation={true}
-          >
-            <Marker
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              title="You are here"
-            />
-          </MapView>
-        )}
-      </View>
-    </TouchableWithoutFeedback>
->>>>>>> origin/main
   );
 };
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
-  container: { flex: 1 },
-  input: { height: 40, borderColor: 'gray', borderWidth: 1, margin: 10, paddingHorizontal: 10 },
-  error: { color: 'red', margin: 10 },
-  map: { flex: 1, marginTop: 10 },
-  timer: { textAlign: 'center', fontSize: 18, color: 'blue', marginTop: 10 },
-});
-
-export default BusBuddy;
-=======
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#121212',
+    padding: 15,
   },
-  title: {
-    fontSize: 28,
-    marginBottom: 20,
-  },
-  error: {
-    color: 'red',
-    marginTop: 10,
+  input: {
+    height: 45,
+    borderColor: '#01dac3',
+    borderWidth: 1,
+    borderRadius: 25,
+    margin: 10,
+    paddingLeft: 15,
+    color: '#fff',
+    fontSize: 16,
   },
   map: {
-    width: '100%',
-    height: '60%',
+    flex: 1,
     marginTop: 20,
+    borderRadius: 10,
+  },
+  errorText: {
+    color: '#ff1744',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 
-
 export default BusBuddy;
- 
->>>>>>> origin/main

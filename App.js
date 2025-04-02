@@ -5,7 +5,6 @@ import HomePage from './app/home';
 import WeatherWizard from './app/weatherWizard';
 import BusBuddy from './app/busBuddy';
 import TrendTracker from './app/trendTracker';
-<<<<<<< HEAD
 import { LogBox } from 'react-native';
 
 if (__DEV__) {
@@ -14,8 +13,6 @@ if (__DEV__) {
     'expo-notifications functionality is not fully supported in Expo Go',
   ]);
 }
-=======
->>>>>>> origin/main
 
 const Nav = createBottomTabNavigator();
 
@@ -31,9 +28,4 @@ const App = () => {
     </NavigationContainer>
   );
 };
-<<<<<<< HEAD
-
-=======
- 
->>>>>>> origin/main
 export default App;
