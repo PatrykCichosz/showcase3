@@ -1,10 +1,10 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import HomePage from './app/home';
 import WeatherWizard from './app/weatherWizard';
 import BusBuddy from './app/busBuddy';
-import TrendTracker from './app/trendTracker';
 import { LogBox } from 'react-native';
 
 if (__DEV__) {
@@ -14,18 +14,42 @@ if (__DEV__) {
   ]);
 }
 
-const Nav = createBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 
-const App = () => {
+export default function App() {
   return (
     <NavigationContainer>
-      <Nav.Navigator>
-        <Nav.Screen name="Home" component={HomePage} />
-        <Nav.Screen name="WeatherWizard" component={WeatherWizard} />
-        <Nav.Screen name="BusBuddy" component={BusBuddy} />
-        <Nav.Screen name="TrendTracker" component={TrendTracker} />
-      </Nav.Navigator>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarActiveTintColor: '#ffffff',
+          tabBarInactiveTintColor: '#cccccc',
+          tabBarStyle: {
+            backgroundColor: '#00796b',
+            borderTopWidth: 0,
+            height: 60,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            marginBottom: 4,
+          },
+          tabBarIcon: ({ color, size }) => {
+            let iconName = 'home-outline';
+            if (route.name === 'Home') {
+              iconName = 'home-outline';
+            } else if (route.name === 'WeatherWizard') {
+              iconName = 'cloud-outline';
+            } else if (route.name === 'BusBuddy') {
+              iconName = 'bus-outline';
+            }
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+        })}
+      >
+        <Tab.Screen name="Home" component={HomePage} />
+        <Tab.Screen name="WeatherWizard" component={WeatherWizard} options={{ title: 'Weather' }} />
+        <Tab.Screen name="BusBuddy" component={BusBuddy} options={{ title: 'Bus' }} />
+      </Tab.Navigator>
     </NavigationContainer>
   );
-};
-export default App;
+}
